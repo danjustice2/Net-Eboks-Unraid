@@ -5,7 +5,7 @@ LABEL description="POP3 proxy for e-Boks (Danish national digital mail) with Mit
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies (libnet-ssleay-perl from apt avoids a finicky CPAN build)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     perl \
     cpanminus \
@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     libexpat1-dev \
     ca-certificates \
+    libnet-ssleay-perl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Perl module dependencies
