@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Net-Eboks</Name>
+  <Repository>net-eboks:latest</Repository>
+  <Registry></Registry>
+  <Network>bridge</Network>
+  <MyIP></MyIP>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/dk/Net-Eboks/issues</Support>
+  <Project>https://github.com/dk/Net-Eboks</Project>
+  <Overview>
+    POP3 proxy for e-Boks (eboks.dk), the Danish national digital mail system.
+    Allows you to read your e-Boks messages via any standard POP3 mail client.
+    Authentication is done via MitID.
+
+    SETUP (one-time, per user):
+    1. Run with EBOKS_MODE=auth and --network=host to complete MitID authentication.
+       Open http://localhost:9999/ in a browser with CORS disabled (see README).
+    2. After authentication, restart with EBOKS_MODE=pop3 (the default).
+    3. Connect your mail client to this host on port 8110.
+       Username: CPR number (e.g. 123456-7890), Password: e-Boks mobile password.
+
+    NOTE: This is a work in progress. See the project README for full details.
+  </Overview>
+  <Category>Network:Other</Category>
+  <WebUI></WebUI>
+  <TemplateURL></TemplateURL>
+  <Icon>https://raw.githubusercontent.com/dk/Net-Eboks/master/example/eboks-icon.png</Icon>
+  <ExtraParams></ExtraParams>
+  <PostArgs></PostArgs>
+  <CPUset></CPUset>
+  <DateInstalled></DateInstalled>
+  <DonateText></DonateText>
+  <DonateLink></DonateLink>
+  <Requires></Requires>
+  <Config
+    Type="Port"
+    Name="POP3 Port"
+    Target="8110"
+    Default="8110"
+    Mode="tcp"
+    Description="POP3 proxy port. Connect your mail client here. Username is CPR (e.g. 123456-7890), password is your e-Boks mobile password."
+    Display="always"
+    Required="true"
+    Mask="false">8110</Config>
+  <Config
+    Type="Port"
+    Name="Auth Web UI Port"
+    Target="9999"
+    Default="9999"
+    Mode="tcp"
+    Description="MitID authentication web UI port. Only used when EBOKS_MODE=auth. Requires host networking or local browser access."
+    Display="always"
+    Required="false"
+    Mask="false">9999</Config>
+  <Config
+    Type="Variable"
+    Name="Mode"
+    Target="EBOKS_MODE"
+    Default="pop3"
+    Description="Service mode: 'pop3' runs the POP3 proxy (normal operation), 'auth' runs the one-time MitID authentication setup wizard."
+    Display="always"
+    Required="true"
+    Mask="false">pop3</Config>
+  <Config
+    Type="Variable"
+    Name="POP3 Listen Address"
+    Target="EBOKS_POP3_ADDR"
+    Default="0.0.0.0"
+    Description="Address for the POP3 server to listen on. Use 0.0.0.0 to accept connections from all interfaces (default for Docker)."
+    Display="advanced"
+    Required="false"
+    Mask="false">0.0.0.0</Config>
+  <Config
+    Type="Variable"
+    Name="POP3 Port (internal)"
+    Target="EBOKS_POP3_PORT"
+    Default="8110"
+    Description="Internal POP3 port inside the container. Change only if you have a reason to."
+    Display="advanced"
+    Required="false"
+    Mask="false">8110</Config>
+  <Config
+    Type="Variable"
+    Name="Debug"
+    Target="EBOKS_DEBUG"
+    Default="0"
+    Description="Set to 1 to enable verbose debug output in container logs."
+    Display="advanced"
+    Required="false"
+    Mask="false">0</Config>
+</Container>

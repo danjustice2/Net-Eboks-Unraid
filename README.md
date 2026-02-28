@@ -1,7 +1,15 @@
 perl API for eboks.dk
 =====================
 
-This is perl interface for http://eboks.dk/, Danish national email system. 
+**Purpose**: This is a Perl interface for [eboks.dk](http://eboks.dk/), the Danish national
+digital mail system. It provides a POP3 proxy so you can read your e-Boks messages in any
+standard mail client, and tools to authenticate via MitID.
+
+> **Note**: The Docker/Unraid packaging in this repository is a **work in progress**.
+> The core Perl module (`Net::Eboks`) is stable and published on CPAN, but the Docker
+> image and Unraid template are experimental and may require manual adjustments.
+
+This is perl interface for http://eboks.dk/, Danish national email system.
 
 Included a simple POP server for proxying e-boks for read-only mail access
 and a simple downloader.
@@ -205,3 +213,72 @@ folder. Get it by running `eboks-dump -l`.
 In both cases the password, authentication etc is the same as if you use only your private eBoks.
 
 Enjoy!
+
+Docker / Unraid
+===============
+
+> **Work in progress.** The Docker image and Unraid template are experimental.
+
+This repository includes a `Dockerfile` and an Unraid Community Applications template
+(`unraid-template.xml`) for running `Net::Eboks` as a containerised POP3 proxy on Unraid
+or any Docker host.
+
+Building the image
+------------------
+
+```sh
+git clone https://github.com/dk/Net-Eboks
+cd Net-Eboks
+docker build -t net-eboks .
+```
+
+One-time MitID authentication (Docker)
+---------------------------------------
+
+The MitID setup wizard (`eboks-auth-mitid`) listens on `localhost:9999`.  Inside a
+container that means you need **host networking** so your browser can reach it:
+
+```sh
+docker run --rm --network host \
+  -e EBOKS_MODE=auth \
+  net-eboks
+```
+
+Then open a CORS-disabled browser on the same machine and go to `http://localhost:9999/`.
+Follow the on-screen instructions (enter your e-Boks password, confirm with MitID app).
+This registers the device on the e-Boks server — it only needs to be done once per user.
+
+Running the POP3 proxy (Docker)
+--------------------------------
+
+After authentication, run the proxy in bridge networking mode:
+
+```sh
+docker run -d \
+  --name net-eboks \
+  -p 8110:8110 \
+  -e EBOKS_MODE=pop3 \
+  net-eboks
+```
+
+Connect your mail client to the Docker host on port 8110.
+Username: your CPR number (e.g. `123456-7890`).
+Password: your e-Boks mobile password.
+
+Environment variables
+----------------------
+
+| Variable          | Default     | Description                                         |
+|-------------------|-------------|-----------------------------------------------------|
+| `EBOKS_MODE`      | `pop3`      | `pop3` for the POP3 proxy, `auth` for MitID setup  |
+| `EBOKS_POP3_PORT` | `8110`      | Internal POP3 listen port                           |
+| `EBOKS_POP3_ADDR` | `0.0.0.0`   | POP3 listen address                                 |
+| `EBOKS_DEBUG`     | `0`         | Set to `1` for verbose debug output                 |
+| `MAILFROM`        | (unset)     | Override the From: address on generated mails       |
+
+Unraid
+-------
+
+Import `unraid-template.xml` into your Unraid Community Applications or add the container
+manually via the Docker tab using the settings from the template.  Run once in `auth` mode
+with host networking to complete MitID setup, then switch to `pop3` mode for normal operation.
