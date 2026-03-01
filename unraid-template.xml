@@ -90,4 +90,13 @@
     Display="advanced"
     Required="false"
     Mask="false">0</Config>
+  <Config
+    Type="Variable"
+    Name="Auth Listen Address"
+    Target="EBOKS_AUTH_LISTEN"
+    Default="0.0.0.0:9999"
+    Description="Address and port for the MitID auth wizard to listen on. Default 0.0.0.0:9999 makes it reachable from the host. Only used when EBOKS_MODE=auth."
+    Display="advanced"
+    Required="false"
+    Mask="false">0.0.0.0:9999</Config>
 </Container>

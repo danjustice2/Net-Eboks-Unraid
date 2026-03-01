@@ -23,15 +23,12 @@ case "$MODE" in
         exec eboks2pop --port "$POP3_PORT" --addr "$POP3_ADDR" $DEBUG_FLAG
         ;;
     auth)
+        AUTH_LISTEN="${EBOKS_AUTH_LISTEN:-0.0.0.0:9999}"
+        export EBOKS_AUTH_LISTEN="$AUTH_LISTEN"
         echo "Starting Net::Eboks MitID authentication wizard..."
         echo ""
-        echo "IMPORTANT: This mode requires host networking (--network host) or"
-        echo "           a browser running inside the container/same host."
-        echo ""
-        echo "Open a browser with CORS disabled and go to: http://localhost:9999/"
-        echo ""
-        echo "  Chrome example:"
-        echo "    mkdir /tmp/chrome && chrome --disable-web-security --user-data-dir=/tmp/chrome"
+        echo "Open a browser and go to: http://<this-host>:9999/"
+        echo "(Replace <this-host> with the hostname or IP of this machine)"
         echo ""
         exec eboks-auth-mitid
         ;;

@@ -353,12 +353,12 @@ sub content
 
 sub attachments { $_[1]->{Attachements}->[0]->{AttachmentInfo} }
 
-sub filename    { 
+sub filename    {
 	my $fn = $_[1]-> {name};
-	$fn =~ s[:\\\/][_];
+	$fn =~ s[:\\\/][_]g;
 	my $fmt = lc($_[1]->{format});
 	$fmt = 'txt' if $fmt eq 'plain';
-	return $fn . '.' .lc($_[1]->{format})
+	return $fn . '.' . $fmt;
 }
 
 sub mime_type

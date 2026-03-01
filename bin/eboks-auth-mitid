@@ -5,6 +5,7 @@ use warnings;
 #BEGIN { $ENV{IO_LAMBDA_DEBUG} = 'http=2' }
 package main;
 use v5.26;
+use Encode;
 use IO::Socket::INET;
 use IO::Lambda v1.33 ':all';
 use IO::Lambda::HTTP::Client qw(http_request);
@@ -26,6 +27,7 @@ $|++;
 
 my $win32_install = (( $ARGV[0] // '' ) eq '--win32-install');
 my $port = 9999;
+my $listen = $ENV{EBOKS_AUTH_LISTEN} // "localhost:$port";
 my ($server, $error);
 my ($state, $code_challenge, $code_verifier, $nonce);
 my $ua = IO::Lambda::HTTP::UserAgent->new;
@@ -61,6 +63,18 @@ sub html($)
 		'Content-Type'   => 'text/html',
 		'Content-Length' => length($html),
 	], $html)
+}
+
+sub rewrite_urls {
+	my ($resp, $proxy_host) = @_;
+	my $ct = $resp->header('Content-Type') // '';
+	return $resp unless $ct =~ m[text/html|javascript|text/css];
+	my $content = $resp->decoded_content;
+	$content =~ s[https://nemlog-in\.mitid\.dk][http://$proxy_host]g;
+	$resp->content(encode('utf-8', $content));
+	$resp->header('Content-Length' => length($resp->content));
+	$resp->remove_header('Content-Encoding');
+	return $resp;
 }
 
 sub pop3
@@ -263,6 +277,7 @@ INIT
 
 	'/step2' => sub {
 		my $req = shift;
+		my $proxy_host = $req->header('Host');
 		my %param = params($req->content);
 		$e->set( password => $param{password} );
 
@@ -291,6 +306,7 @@ INIT
 				if ( ref $resp ) {
 					$resp->header( 'Access-Control-Allow-Origin'  => '*');
 					$resp->header( 'Cross-Origin-Resource-Policy' => 'cross-origin');
+					rewrite_urls($resp, $proxy_host);
 				}
 				return $resp;
 			};
@@ -352,22 +368,29 @@ $routes{'/'} = $win32_install ? $routes{'/win32_install'} : $routes{'/auth'};
 	if ( my $cb = $routes{$req->uri}) {
 		return $cb->($req);
 	} else {
+		my $proxy_host = $req->header('Host');
 		$req->uri("https://nemlog-in.mitid.dk" . $req->uri->path);
 		$req->header( Host    => 'nemlog-in.mitid.dk');
 		if ( my $origin = $req->header('Origin')) {
-			$origin =~ s[http://localhost:9999][https://nemlog-in.mitid.dk];
+			$origin =~ s[^http://[^/]+][https://nemlog-in.mitid.dk];
 			$req->header( Origin => $origin);
 		}
 		if ( my $referer = $req->header('Referer')) {
-			$referer =~ s[http://localhost:9999/step2][https://nemlog-in.mitid.dk/login/mitid];
-			$referer =~ s[http://localhost:9999/][https://nemlog-in.mitid.dk/login/mitid];
+			$referer =~ s[^http://[^/]+(?:/step2)?/][https://nemlog-in.mitid.dk/login/mitid];
 			$req->header( Referer => $referer);
 		}
 		$req->headers->remove_header('Cookie');
 		$req->header( 'Accept-Encoding' => 'identity');
-		return $ua->request($req);
+		return lambda {
+			context $ua->request($req);
+			tail {
+				my $resp = shift;
+				rewrite_urls($resp, $proxy_host) if ref $resp && $resp->is_success;
+				return $resp;
+			};
+		};
 	}
-} "localhost:$port", timeout => 10;
+} $listen, timeout => 10;
 die $error unless $server;
 
 if ( $win32_install ) {
@@ -377,5 +400,5 @@ if ( $win32_install ) {
 }
 
 print "Open a browser and go to this address:\n";
-print "\n   http://localhost:$port/\n\n";
+print "\n   http://$listen/\n\n";
 $server->wait;
