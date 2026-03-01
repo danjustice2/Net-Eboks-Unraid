@@ -35,7 +35,7 @@ RUN cpanm --notest --quiet \
     Getopt::Long \
     Digest::SHA \
     IO::Socket::SSL \
-    Crypt::OpenSSL::RSA \
+    'Crypt::OpenSSL::RSA@0.34' \
     JSON::XS \
     URI \
     URI::QueryParam \
