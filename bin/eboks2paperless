@@ -46,14 +46,27 @@ die "Password required (--password or EBOKS_PASSWORD env var)\n" unless $opt{pas
 
 $opt{cpr} =~ s/-//g;
 
-make_path($opt{output}) unless -d $opt{output};
+make_path($opt{output}, { error => \my @make_errors }) unless -d $opt{output};
+if (@make_errors) {
+	my $msg = join ', ', map { values %$_ } @make_errors;
+	die "Cannot create output directory '$opt{output}': $msg\n";
+}
 
+# State file tracks which message IDs have been downloaded. It lives inside the
+# output directory for simplicity. Paperless-ngx ignores dotfiles by default
+# (its PAPERLESS_CONSUMER_IGNORE_PATTERNS defaults to [".*", "~*"]), so
+# .seen_messages will not be ingested — but verify this against your version if
+# in doubt, or move the state file elsewhere and point EBOKS_DUMP_DIR at a
+# subdirectory.
 my $state_file = "$opt{output}/.seen_messages";
 
 sub load_seen
 {
-	return {} unless -f $state_file;
-	open my $fh, '<', $state_file or return {};
+	# File absent = first run, that is normal.
+	return {} unless -e $state_file;
+	# File present but unreadable = something is wrong; die rather than silently
+	# re-downloading everything.
+	open my $fh, '<', $state_file or die "Cannot read state file $state_file: $!\n";
 	my %seen;
 	while (<$fh>) {
 		chomp;
@@ -65,9 +78,13 @@ sub load_seen
 sub save_seen
 {
 	my ($seen) = @_;
-	open my $fh, '>', $state_file or die "Cannot write $state_file: $!";
+	# Write to a temp file then rename so the state file is never left in a
+	# partially-written state if the process is killed mid-write.
+	my $tmp = "$state_file.tmp.$$";
+	open my $fh, '>', $tmp or die "Cannot write $tmp: $!\n";
 	print $fh "$_\n" for sort keys %$seen;
 	close $fh;
+	rename $tmp, $state_file or die "Cannot rename $tmp -> $state_file: $!\n";
 }
 
 sub safe_filename
@@ -101,6 +118,7 @@ sub run_once
 	my ($folders);
 	($folders, $error) = $e->fetch_request($e->folders)->wait;
 	die "Cannot get folders: $error\n" if defined $error;
+	die "No Inbox folder found in account\n" unless $folders->{Inbox};
 
 	my ($list);
 	($list, $error) = $e->list_all_messages(undef, $folders->{Inbox}->{id})->wait;

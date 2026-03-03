@@ -35,6 +35,8 @@ case "$MODE" in
     dump)
         DUMP_DIR="${EBOKS_DUMP_DIR:-/consume}"
         DUMP_INTERVAL="${EBOKS_DUMP_INTERVAL:-0}"
+        # Credentials are read by eboks2paperless directly from EBOKS_CPR and
+        # EBOKS_PASSWORD env vars; we validate them here for a clear early error.
         if [ -z "${EBOKS_CPR:-}" ] || [ -z "${EBOKS_PASSWORD:-}" ]; then
             echo "ERROR: EBOKS_MODE=dump requires EBOKS_CPR and EBOKS_PASSWORD env vars."
             exit 1

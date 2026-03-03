@@ -107,7 +107,7 @@
     Description="Your CPR number (digits only, e.g. 1234567890). Required when EBOKS_MODE=dump."
     Display="always"
     Required="false"
-    Mask="false"></Config>
+    Mask="true"></Config>
   <Config
     Type="Variable"
     Name="e-Boks Password"

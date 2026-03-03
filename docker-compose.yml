@@ -23,8 +23,13 @@ services:
       # EBOKS_CPR: "1234567890"        # CPR number without dash
       # EBOKS_PASSWORD: "secret"       # e-Boks mobile password
       # EBOKS_DUMP_DIR: /consume       # directory to write .eml files into
-      # EBOKS_DUMP_INTERVAL: "3600"    # poll every N seconds; 0 = run once
+      # EBOKS_DUMP_INTERVAL: "3600"    # poll every N seconds; 0 = run once and exit
+      #
+      # Note: with EBOKS_DUMP_INTERVAL=0 and restart: unless-stopped, Docker will
+      # restart the container after each run, effectively polling on Docker's restart
+      # back-off schedule. Set a non-zero interval to control the poll rate instead.
 
-    # Uncomment and adjust when using dump mode:
+    # Mount your Paperless-ngx consume directory (or any watch directory) here.
+    # Adjust the host path to match your setup:
     # volumes:
-    #   - /mnt/user/appdata/paperless/consume:/consume
+    #   - /path/to/paperless/consume:/consume
