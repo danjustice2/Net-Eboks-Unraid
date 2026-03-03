@@ -59,7 +59,7 @@
     Name="Mode"
     Target="EBOKS_MODE"
     Default="pop3"
-    Description="Service mode: 'pop3' runs the POP3 proxy (normal operation), 'auth' runs the one-time MitID authentication setup wizard."
+    Description="Service mode: 'pop3' runs the POP3 proxy (normal operation), 'auth' runs the one-time MitID authentication setup wizard, 'dump' writes new messages as .eml files to EBOKS_DUMP_DIR (for Paperless-ngx)."
     Display="always"
     Required="true"
     Mask="false">pop3</Config>
@@ -99,4 +99,40 @@
     Display="advanced"
     Required="false"
     Mask="false">0.0.0.0:9999</Config>
+  <Config
+    Type="Variable"
+    Name="CPR Number"
+    Target="EBOKS_CPR"
+    Default=""
+    Description="Your CPR number (digits only, e.g. 1234567890). Required when EBOKS_MODE=dump."
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
+  <Config
+    Type="Variable"
+    Name="e-Boks Password"
+    Target="EBOKS_PASSWORD"
+    Default=""
+    Description="Your e-Boks mobile password. Required when EBOKS_MODE=dump."
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
+  <Config
+    Type="Path"
+    Name="Dump Output Directory"
+    Target="EBOKS_DUMP_DIR"
+    Default="/consume"
+    Description="Container path where new messages are written as .eml files (for Paperless-ngx). Mount your Paperless-ngx consume directory here. Only used when EBOKS_MODE=dump."
+    Display="always"
+    Required="false"
+    Mask="false">/consume</Config>
+  <Config
+    Type="Variable"
+    Name="Dump Poll Interval"
+    Target="EBOKS_DUMP_INTERVAL"
+    Default="3600"
+    Description="How often (in seconds) to check for new messages in dump mode. Set to 0 to run once and exit. Only used when EBOKS_MODE=dump."
+    Display="advanced"
+    Required="false"
+    Mask="false">3600</Config>
 </Container>

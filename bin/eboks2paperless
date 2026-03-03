@@ -1,0 +1,184 @@
+#!perl
+use strict;
+use warnings;
+use Net::Eboks;
+use Getopt::Long;
+use File::Path qw(make_path);
+
+my %opt = (
+	cpr      => $ENV{EBOKS_CPR}           // '',
+	password => $ENV{EBOKS_PASSWORD}      // '',
+	output   => $ENV{EBOKS_DUMP_DIR}      // '/consume',
+	interval => $ENV{EBOKS_DUMP_INTERVAL} // 0,
+	debug    => 0,
+);
+
+sub usage
+{
+	print <<USAGE;
+
+$0 - Dump new e-Boks messages to a directory (e.g. Paperless-ngx consume dir)
+
+   --cpr      CPR  - CPR number, e.g. 123456-7890 (or set EBOKS_CPR)
+   --password PW   - e-Boks mobile password (or set EBOKS_PASSWORD)
+   --output   DIR  - directory to write .eml files into (default: /consume)
+   --interval SECS - poll every SECS seconds; 0 = run once and exit (default: 0)
+   --debug         - verbose output
+   --help
+
+USAGE
+	exit 1;
+}
+
+GetOptions(\%opt,
+	"help|h",
+	"cpr|c=s",
+	"password|p=s",
+	"output|o=s",
+	"interval|i=i",
+	"debug",
+) or usage;
+
+$opt{help} and usage();
+
+die "CPR required (--cpr or EBOKS_CPR env var)\n"           unless $opt{cpr};
+die "Password required (--password or EBOKS_PASSWORD env var)\n" unless $opt{password};
+
+$opt{cpr} =~ s/-//g;
+
+make_path($opt{output}, { error => \my @make_errors }) unless -d $opt{output};
+if (@make_errors) {
+	my $msg = join ', ', map { values %$_ } @make_errors;
+	die "Cannot create output directory '$opt{output}': $msg\n";
+}
+
+# State file tracks which message IDs have been downloaded. It lives inside the
+# output directory for simplicity. Paperless-ngx ignores dotfiles by default
+# (its PAPERLESS_CONSUMER_IGNORE_PATTERNS defaults to [".*", "~*"]), so
+# .seen_messages will not be ingested — but verify this against your version if
+# in doubt, or move the state file elsewhere and point EBOKS_DUMP_DIR at a
+# subdirectory.
+my $state_file = "$opt{output}/.seen_messages";
+
+sub load_seen
+{
+	# File absent = first run, that is normal.
+	return {} unless -e $state_file;
+	# File present but unreadable = something is wrong; die rather than silently
+	# re-downloading everything.
+	open my $fh, '<', $state_file or die "Cannot read state file $state_file: $!\n";
+	my %seen;
+	while (<$fh>) {
+		chomp;
+		$seen{$_} = 1;
+	}
+	return \%seen;
+}
+
+sub save_seen
+{
+	my ($seen) = @_;
+	# Write to a temp file then rename so the state file is never left in a
+	# partially-written state if the process is killed mid-write.
+	my $tmp = "$state_file.tmp.$$";
+	open my $fh, '>', $tmp or die "Cannot write $tmp: $!\n";
+	print $fh "$_\n" for sort keys %$seen;
+	close $fh;
+	rename $tmp, $state_file or die "Cannot rename $tmp -> $state_file: $!\n";
+}
+
+sub safe_filename
+{
+	my $s = shift;
+	$s =~ s{[/\\:*?"<>|]}{_}g;
+	$s =~ s/\s+/_/g;
+	$s =~ s/^_+|_+$//g;
+	return $s || 'untitled';
+}
+
+sub debug_print
+{
+	return unless $opt{debug};
+	print @_, "\n";
+}
+
+sub run_once
+{
+	print "Connecting to e-Boks...\n";
+	my $e = Net::Eboks->new(
+		cpr      => $opt{cpr},
+		password => $opt{password},
+	);
+
+	my ($uname, $error);
+	($uname, $error) = $e->fetch_request($e->login_nemid)->wait;
+	die "Login failed: $error\n" if defined $error;
+	print "Logged in as: $uname\n";
+
+	my ($folders);
+	($folders, $error) = $e->fetch_request($e->folders)->wait;
+	die "Cannot get folders: $error\n" if defined $error;
+	die "No Inbox folder found in account\n" unless $folders->{Inbox};
+
+	my ($list);
+	($list, $error) = $e->list_all_messages(undef, $folders->{Inbox}->{id})->wait;
+	die "Cannot get message list: $error\n" if defined $error;
+
+	my $total = scalar keys %$list;
+	debug_print("Total messages in Inbox: $total");
+
+	my $seen = load_seen();
+	my $new_count = 0;
+
+	for my $msgid (sort keys %$list) {
+		next if $seen->{$msgid};
+
+		my $m = $list->{$msgid};
+
+		my $date = '';
+		if (($m->{receivedDateTime} // '') =~ /^(\d{4}-\d{2}-\d{2})/) {
+			$date = $1;
+		}
+
+		my $title    = safe_filename($m->{name} // 'untitled');
+		my $fn_base  = $date ? "${date}_${title}" : $title;
+		my $fn       = "$opt{output}/$fn_base.eml";
+		my $suffix   = 1;
+		while (-e $fn) {
+			$fn = "$opt{output}/${fn_base}_${suffix}.eml";
+			$suffix++;
+		}
+
+		print "Fetching: $fn_base\n";
+		my ($msg, $err2) = $e->fetch_message_and_attachments($m)->wait;
+		if (defined $err2) {
+			warn "Error fetching message $msgid: $err2\n";
+			next;
+		}
+
+		open my $fh, '>', $fn or do { warn "Cannot write $fn: $!\n"; next };
+		# assemble_mail prepends an mbox "From ..." separator; strip it for .eml
+		my $mail_text = $e->assemble_mail(%$msg);
+		$mail_text =~ s/^From [^\n]+\n//;
+		print $fh $mail_text;
+		close $fh;
+
+		$seen->{$msgid} = 1;
+		$new_count++;
+		print "Saved: $fn\n";
+	}
+
+	save_seen($seen);
+	print "$new_count new message(s) saved to $opt{output}\n";
+}
+
+if ($opt{interval} > 0) {
+	while (1) {
+		eval { run_once() };
+		warn "Error during run: $@" if $@;
+		print "Sleeping $opt{interval}s until next check...\n";
+		sleep $opt{interval};
+	}
+} else {
+	run_once();
+}

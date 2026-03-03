@@ -6,6 +6,7 @@ Makefile.PL
 Eboks.pm
 bin/eboks2pop
 bin/eboks-dump
+bin/eboks2paperless
 bin/eboks-auth-mitid
 bin/eboks-install-win32
 t/01.t
