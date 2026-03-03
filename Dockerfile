@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 LABEL maintainer="Net-Eboks Docker"
-LABEL description="POP3 proxy for e-Boks (Danish national digital mail) with MitID authentication"
+LABEL description="Docker packaging for Net::Eboks — POP3 proxy and document dumper for e-Boks (Danish national digital mail)"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libexpat1-dev \
     ca-certificates \
     libnet-ssleay-perl \
+    netbase \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Perl module dependencies

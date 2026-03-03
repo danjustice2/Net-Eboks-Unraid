@@ -214,33 +214,126 @@ In both cases the password, authentication etc is the same as if you use only yo
 
 Enjoy!
 
-Docker / Unraid
-===============
+Docker
+======
 
-> **Work in progress.** The Docker image and Unraid template are experimental.
+This repository packages `Net::Eboks` as a Docker container.  It runs on any
+Docker host — including Unraid, which has its own section below.
 
-This repository includes a `Dockerfile`, a `docker-compose.yml`, and an Unraid template
-(`unraid-template.xml`) for running `Net::Eboks` as a containerised POP3 proxy on Unraid
-or any Docker host.
+Three modes are available via the `EBOKS_MODE` environment variable:
+
+| Mode   | What it does |
+|--------|--------------|
+| `pop3` | Runs a POP3 proxy on port 8110. Point any mail client at it. |
+| `auth` | Runs the one-time MitID registration wizard on port 9999. |
+| `dump` | Fetches new messages and writes them as `.eml` files to a directory (e.g. a Paperless-ngx consume folder). |
 
 Environment variables
 ----------------------
 
-| Variable            | Default         | Description                                          |
-|---------------------|-----------------|------------------------------------------------------|
-| `EBOKS_MODE`        | `pop3`          | `pop3` for the POP3 proxy, `auth` for MitID setup   |
-| `EBOKS_POP3_PORT`   | `8110`          | Internal POP3 listen port                            |
-| `EBOKS_POP3_ADDR`   | `0.0.0.0`       | POP3 listen address                                  |
-| `EBOKS_AUTH_LISTEN` | `0.0.0.0:9999`  | Auth wizard listen address (auth mode only)          |
-| `EBOKS_DEBUG`       | `0`             | Set to `1` for verbose debug output                  |
-| `MAILFROM`          | (unset)         | Override the From: address on generated mails        |
+| Variable               | Default        | Description                                                     |
+|------------------------|----------------|-----------------------------------------------------------------|
+| `EBOKS_MODE`           | `pop3`         | Operating mode: `pop3`, `auth`, or `dump`                       |
+| `EBOKS_POP3_PORT`      | `8110`         | POP3 listen port (pop3 mode)                                    |
+| `EBOKS_POP3_ADDR`      | `0.0.0.0`      | POP3 listen address (pop3 mode)                                 |
+| `EBOKS_AUTH_LISTEN`    | `0.0.0.0:9999` | Auth wizard listen address (auth mode)                          |
+| `EBOKS_CPR`            | (required)     | CPR number without dash, e.g. `1234567890` (dump mode)          |
+| `EBOKS_PASSWORD`       | (required)     | e-Boks mobile password (dump mode)                              |
+| `EBOKS_DUMP_DIR`       | `/consume`     | Directory to write `.eml` files into (dump mode)                |
+| `EBOKS_DUMP_INTERVAL`  | `0`            | Poll every N seconds; `0` = run once and exit (dump mode)       |
+| `EBOKS_DEBUG`          | `0`            | Set to `1` for verbose debug output                             |
+| `MAILFROM`             | (unset)        | Override the `From:` address on generated mails                 |
 
-Unraid via Docker Compose Manager plugin (recommended)
--------------------------------------------------------
+Docker Compose (any host)
+--------------------------
+
+**1. Clone and build**
+
+```sh
+git clone https://github.com/danjustice2/Net-Eboks-Unraid
+cd Net-Eboks-Unraid
+docker compose build
+```
+
+**2. One-time MitID authentication**
+
+Edit `docker-compose.yml` and set `EBOKS_MODE: auth`, then:
+
+```sh
+docker compose up
+```
+
+Open a CORS-disabled browser and go to `http://<host-ip>:9999/`.  Enter your
+e-Boks password and confirm with the MitID app.  This only needs to be done
+**once per user** — the device registration is stored on the e-Boks server.
+
+```sh
+docker compose down
+```
+
+**3. Run**
+
+Edit `docker-compose.yml`, set `EBOKS_MODE: pop3` (or `dump`), then:
+
+```sh
+docker compose up -d
+```
+
+**Updating**
+
+```sh
+git pull
+docker compose build
+docker compose up -d
+```
+
+Plain `docker run` (any host)
+------------------------------
+
+**One-time MitID authentication:**
+
+```sh
+docker run --rm --network host -e EBOKS_MODE=auth net-eboks
+```
+
+Open `http://<host-ip>:9999/` in a CORS-disabled browser and follow the
+on-screen instructions.
+
+**Run the POP3 proxy:**
+
+```sh
+docker run -d \
+  --name net-eboks \
+  --restart unless-stopped \
+  -p 8110:8110 \
+  net-eboks
+```
+
+Connect your mail client to port **8110**.
+Username: your CPR number (e.g. `123456-7890`).
+Password: your e-Boks mobile password.
+
+**Run in dump mode (Paperless-ngx):**
+
+```sh
+docker run -d \
+  --name net-eboks \
+  --restart unless-stopped \
+  -e EBOKS_MODE=dump \
+  -e EBOKS_CPR=1234567890 \
+  -e EBOKS_PASSWORD=secret \
+  -e EBOKS_DUMP_INTERVAL=3600 \
+  -v /path/to/paperless/consume:/consume \
+  net-eboks
+```
+
+Unraid
+-------
+
+### Via Compose Manager (recommended)
 
 The [Compose Manager](https://forums.unraid.net/topic/114415-plugin-docker-compose-manager/)
-plugin lets you run Docker Compose stacks from the Unraid UI.  It is the easiest way to
-manage this container on Unraid.
+plugin lets you run Docker Compose stacks from the Unraid UI.
 
 **1. Install the plugin**
 
@@ -251,97 +344,30 @@ In the Unraid WebUI go to **Apps** (Community Applications), search for
 
 ```sh
 ssh root@<unraid-ip>
-git clone https://github.com/dk/Net-Eboks /boot/config/plugins/compose.manager/projects/net-eboks
+git clone https://github.com/danjustice2/Net-Eboks-Unraid /boot/config/plugins/compose.manager/projects/net-eboks
 ```
 
-Alternatively, copy just `docker-compose.yml` into a new project folder:
+**3. Build and authenticate**
 
-```sh
-mkdir -p /boot/config/plugins/compose.manager/projects/net-eboks
-# copy docker-compose.yml there
-```
+Follow steps 2–3 from the Docker Compose section above, substituting
+`<unraid-ip>` for `<host-ip>`.  The stack is then manageable under
+**Docker → Compose** in the Unraid WebUI.
 
-**3. Build the image**
+**Updating**
 
 ```sh
 cd /boot/config/plugins/compose.manager/projects/net-eboks
+git pull
 docker compose build
-```
-
-**4. One-time MitID authentication**
-
-Edit `docker-compose.yml` and set `EBOKS_MODE: auth`, then start the stack:
-
-```sh
-docker compose up
-```
-
-Open a CORS-disabled browser on the same machine (or any machine on your network) and go
-to `http://<unraid-ip>:9999/`.  Follow the on-screen instructions — enter your e-Boks
-password and confirm with the MitID app.  This registers the device on the e-Boks server
-and only needs to be done **once per user**.
-
-Stop the stack when done:
-
-```sh
-docker compose down
-```
-
-**5. Switch to POP3 mode**
-
-Edit `docker-compose.yml` and set `EBOKS_MODE: pop3` (the default), then start the stack
-again.  From the Unraid WebUI you can now manage the stack under **Docker → Compose**.
-
-```sh
 docker compose up -d
 ```
 
-Connect your mail client to the Unraid server on port **8110**.
-Username: your CPR number (e.g. `123456-7890`).
-Password: your e-Boks mobile password.
+### Via Docker Manager template (legacy)
 
-Unraid via Docker Manager template (legacy)
---------------------------------------------
+If you prefer the classic Unraid Docker tab UI, import `unraid-template.xml`
+via **Docker → Add Container → Template repositories**, or add the container
+manually using the settings from the template.
 
-If you prefer the classic Unraid Docker tab UI, import `unraid-template.xml` via
-**Docker → Add Container → Template repositories**, or add the container manually
-using the settings from the template.
-
-Because the Docker Manager UI does not support switching `EBOKS_MODE` easily, the
-recommended approach for the one-time MitID auth step is still the Compose workflow above,
-or use a plain `docker run` command (see below).
-
-Plain Docker (any host)
-------------------------
-
-**Build:**
-
-```sh
-git clone https://github.com/dk/Net-Eboks
-cd Net-Eboks
-docker build -t net-eboks .
-```
-
-**One-time MitID authentication:**
-
-```sh
-docker run --rm -p 9999:9999 -e EBOKS_MODE=auth net-eboks
-```
-
-Open `http://<host-ip>:9999/` in a CORS-disabled browser and follow the on-screen
-instructions.
-
-**Run the POP3 proxy:**
-
-```sh
-docker run -d \
-  --name net-eboks \
-  --restart unless-stopped \
-  -p 8110:8110 \
-  -e EBOKS_MODE=pop3 \
-  net-eboks
-```
-
-Connect your mail client to the host on port 8110.
-Username: your CPR number (e.g. `123456-7890`).
-Password: your e-Boks mobile password.
+Note: the Docker Manager UI does not support toggling `EBOKS_MODE` easily, so
+the one-time MitID auth step is easier to do via the Compose workflow or a
+plain `docker run` command.
