@@ -1,0 +1,18 @@
+services:
+  net-eboks:
+    image: net-eboks:latest
+    build:
+      context: .
+    container_name: Net-Eboks
+    restart: unless-stopped
+    ports:
+      - "8110:8110"   # POP3 proxy (used in pop3 mode)
+      - "9999:9999"   # MitID auth web UI (used in auth mode only)
+    environment:
+      # Set to "auth" for the one-time MitID setup, then back to "pop3"
+      EBOKS_MODE: pop3
+      EBOKS_POP3_PORT: "8110"
+      EBOKS_POP3_ADDR: "0.0.0.0"
+      EBOKS_DEBUG: "0"
+      # Uncomment to override the From: address on generated mails:
+      # MAILFROM: "your@email.com"
