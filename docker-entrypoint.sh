@@ -32,8 +32,24 @@ case "$MODE" in
         echo ""
         exec eboks-auth-mitid
         ;;
+    dump)
+        DUMP_DIR="${EBOKS_DUMP_DIR:-/consume}"
+        DUMP_INTERVAL="${EBOKS_DUMP_INTERVAL:-0}"
+        if [ -z "${EBOKS_CPR:-}" ] || [ -z "${EBOKS_PASSWORD:-}" ]; then
+            echo "ERROR: EBOKS_MODE=dump requires EBOKS_CPR and EBOKS_PASSWORD env vars."
+            exit 1
+        fi
+        echo "Starting Net::Eboks Paperless-ngx dump mode..."
+        echo "Output directory: ${DUMP_DIR}"
+        if [ "${DUMP_INTERVAL}" = "0" ]; then
+            echo "Running once (set EBOKS_DUMP_INTERVAL to poll periodically)."
+        else
+            echo "Polling every ${DUMP_INTERVAL} seconds."
+        fi
+        exec eboks2paperless --output "$DUMP_DIR" --interval "$DUMP_INTERVAL" $DEBUG_FLAG
+        ;;
     *)
-        echo "Unknown EBOKS_MODE: '$MODE'. Valid modes: pop3, auth"
+        echo "Unknown EBOKS_MODE: '$MODE'. Valid modes: pop3, auth, dump"
         exit 1
         ;;
 esac
